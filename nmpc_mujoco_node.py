@@ -37,7 +37,7 @@ import rclpy
 from config.experiment_config import (
     P0, X0,
     T_FINAL, FREC, T_S, T_PREDICTION, N_PREDICTION,
-    G, MASS, MASS_MUJOCO, MASS_RATIO,
+    G, MASS_MUJOCO,
     trayectoria,
 )
 
@@ -45,7 +45,7 @@ from config.experiment_config import (
 from utils.numpy_utils import euler_to_quaternion, rk4_step_quadrotor
 from ocp.nmpc_controller_rate import build_ocp_solver
 from utils.graficas import (
-    plot_pose, plot_control,
+    plot_pose, plot_control_rate, plot_omega_cmd_vs_actual,
     plot_vel_lineal, plot_vel_angular, plot_timing,
 )
 
@@ -54,6 +54,7 @@ from ros2_interface.mujoco_interface import (
     MujocoInterface,
     wait_for_connection,
 )
+from ros2_interface.reset_sim import SimControl
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,6 +69,11 @@ def main():
     # Spin ROS 2 in background thread
     spin_thread = threading.Thread(target=rclpy.spin, args=(muj,), daemon=True)
     spin_thread.start()
+
+    # ── SimControl: reset/reload the simulation ──────────────────────────
+    sim = SimControl(node=muj)
+    print("[SIM]  Resetting simulation...")
+    sim.reset()
 
     # Wait for odom
     if not wait_for_connection(muj):
@@ -85,8 +91,7 @@ def main():
     N_prediction = N_PREDICTION
     print(f"[CONFIG]  frec={frec} Hz  |  t_s={t_s*1e3:.2f} ms  "
           f"|  t_prediction={t_prediction} s  |  N_prediction={N_prediction} steps")
-    print(f"[CONFIG]  MASS_NMPC={MASS} kg  |  MASS_MUJOCO={MASS_MUJOCO} kg  "
-          f"|  ratio={MASS_RATIO:.3f}")
+    print(f"[CONFIG]  MASS_MUJOCO={MASS_MUJOCO} kg  (model uses real mass, no scaling)")
 
     # ── Time vector ──────────────────────────────────────────────────────
     t = np.arange(0, t_final + t_s, t_s)
@@ -129,7 +134,8 @@ def main():
     xref[9, :]  = quatd[3, :]
 
     # ── Control storage ──────────────────────────────────────────────────
-    u_control = np.zeros((4, N_sim), dtype=np.double)
+    u_control   = np.zeros((4, N_sim), dtype=np.double)
+    T_sent_hist = np.zeros(N_sim, dtype=np.double)   # thrust after scaling/clip
 
     # ── Build solver ─────────────────────────────────────────────────────
     acados_ocp_solver, ocp, model, f = build_ocp_solver(
@@ -192,9 +198,9 @@ def main():
         # ── Send command to MuJoCo ───────────────────────────────────────
         #    NMPC output:  u = [T, wx_cmd, wy_cmd, wz_cmd]
         #    MuJoCo input: (thrust [N], wx, wy, wz [rad/s])
-        #    → DIRECT mapping, no conversion needed!
-        T_send = u_control[0, k] * MASS_RATIO
-        T_send = np.clip(T_send, 0.0, 80.0)
+        #    Model uses MASS_MUJOCO → T_cmd already correct, no scaling needed.
+        T_send = np.clip(u_control[0, k], 0.0, 80.0)
+        T_sent_hist[k] = T_send
         muj.send_cmd(T_send, u_control[1, k], u_control[2, k], u_control[3, k])
 
         # ── Rate control ─────────────────────────────────────────────────
@@ -232,27 +238,33 @@ def main():
     #  Post-processing
     # ══════════════════════════════════════════════════════════════════════
     _script_dir = os.path.dirname(os.path.abspath(__file__))
+    _results_dir = os.path.join(_script_dir, "results_sim")
+    os.makedirs(_results_dir, exist_ok=True)
+
+    def _save(fig, name):
+        path = os.path.join(_results_dir, name)
+        fig.savefig(path, dpi=150)
+        print(f"Saved {name}")
 
     print("Generating figures...")
-    fig1 = plot_pose(x, xref, t)
-    fig1.savefig(os.path.join(_script_dir, "1_pose_mujoco.png"))
-    print("Saved 1_pose_mujoco.png")
 
-    fig2 = plot_control(u_control, t)
-    fig2.savefig(os.path.join(_script_dir, "2_control_mujoco.png"))
-    print("Saved 2_control_mujoco.png")
+    fig1 = plot_pose(x, xref, t)
+    _save(fig1, "1_pose_mujoco.png")
+
+    fig2 = plot_control_rate(u_control, t, T_sent=T_sent_hist)
+    _save(fig2, "2_control_mujoco.png")
 
     fig3 = plot_vel_lineal(x[3:6, :], t)
-    fig3.savefig(os.path.join(_script_dir, "3_vel_lineal_mujoco.png"))
-    print("Saved 3_vel_lineal_mujoco.png")
+    _save(fig3, "3_vel_lineal_mujoco.png")
 
     fig4 = plot_vel_angular(x[10:13, :], t)
-    fig4.savefig(os.path.join(_script_dir, "4_vel_angular_mujoco.png"))
-    print("Saved 4_vel_angular_mujoco.png")
+    _save(fig4, "4_vel_angular_mujoco.png")
+
+    fig5 = plot_omega_cmd_vs_actual(u_control[1:4, :], x[10:13, :], t)
+    _save(fig5, "5_omega_cmd_vs_actual_mujoco.png")
 
     fig6 = plot_timing(t_solver, t_loop, t_sample, t)
-    fig6.savefig(os.path.join(_script_dir, "6_timing_mujoco.png"))
-    print("Saved 6_timing_mujoco.png")
+    _save(fig6, "6_timing_mujoco.png")
 
     # ── Timing statistics ────────────────────────────────────────────────
     s_ms = t_solver[0, :] * 1e3

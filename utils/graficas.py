@@ -128,6 +128,97 @@ def plot_control(u, t):
     return fig
 
 
+def plot_control_rate(u, t, T_sent=None):
+    """Control inputs for rate-control mode: [T_cmd, wx_cmd, wy_cmd, wz_cmd].
+
+    T_cmd  : thrust computed by NMPC assuming m_model (1.0 kg)
+    T_sent : T_cmd × (m_MuJoCo / m_model), actually sent to simulator.
+             They differ by MASS_RATIO (~1.08). They only coincide when
+             saturation clips T_sent — that is the useful thing to observe.
+
+    Parameters
+    ----------
+    u       : ndarray (4, N)  – NMPC output [T [N], wx, wy, wz [rad/s]]
+    t       : ndarray         – time vector
+    T_sent  : ndarray (N,), optional – thrust after mass-ratio scaling + clipping
+    """
+    fig, axs = plt.subplots(4, 1, figsize=(9, 9), sharex=True)
+    colors = [C_RED, C_GREEN, C_BLUE, C_GOLD]
+    t_u = t[:u.shape[1]]
+
+    # ── Thrust subplot ────────────────────────────────────────────────────
+    axs[0].plot(t_u, u[0, :], color=C_RED, lw=2.0, ls='-',
+                label=r'$T_{cmd}$: NMPC output (uses real mass)')
+    if T_sent is not None:
+        axs[0].plot(t_u, T_sent, color=C_ORANGE, lw=1.8, ls='--',
+                    label=r'$T_{sent}$: clipped to [0, 80] N — diverges only at saturation')
+    axs[0].set_ylabel(r'Thrust [N]')
+    axs[0].legend(frameon=True, ncol=1, fontsize=10, loc='best')
+    _grid(axs[0])
+
+    # ── Angular rate commands ─────────────────────────────────────────────
+    rate_labels = [
+        r'$\omega_{x,cmd}$: body roll-rate command  [rad/s]',
+        r'$\omega_{y,cmd}$: body pitch-rate command [rad/s]',
+        r'$\omega_{z,cmd}$: body yaw-rate command   [rad/s]',
+    ]
+    for i in range(3):
+        axs[i + 1].plot(t_u, u[i + 1, :], color=colors[i + 1], lw=1.8, ls='-',
+                        label=rate_labels[i])
+        axs[i + 1].set_ylabel(r'[rad/s]')
+        axs[i + 1].legend(frameon=True, ncol=1, fontsize=10, loc='best')
+        _grid(axs[i + 1])
+
+    axs[-1].set_xlabel(r"$t$ [s]")
+    fig.suptitle("NMPC control outputs (rate-control mode)", fontsize=13)
+    fig.tight_layout()
+    return fig
+
+
+def plot_omega_cmd_vs_actual(w_cmd, w_actual, t):
+    """Commanded vs measured angular velocity (body frame) — 3 subplots.
+
+    Validates the inner rate controller of MuJoCo's AcroMode:
+      - w_cmd    : setpoint sent by NMPC to the rate controller
+      - w_actual : angular velocity measured from odometry
+
+    Good tracking → curves overlap. Large gap → rate controller is
+    too slow (increase bandwidth) or NMPC commands exceed actuator limits.
+
+    Parameters
+    ----------
+    w_cmd    : ndarray (3, N)   – NMPC commanded [wx, wy, wz] [rad/s]
+    w_actual : ndarray (3, N+1) – from MuJoCo odometry [wx, wy, wz] [rad/s]
+    t        : ndarray          – time vector
+    """
+    axes_names = ['x (roll)', 'y (pitch)', 'z (yaw)']
+    colors     = [C_RED, C_GREEN, C_BLUE]
+    N   = w_cmd.shape[1]
+    t_u = t[:N]
+
+    fig, axs = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
+    for i in range(3):
+        axs[i].plot(t_u, w_cmd[i, :],
+                    color=colors[i], lw=2.0, ls='--',
+                    label=rf'$\omega_{{{axes_names[i][:1]},cmd}}$: NMPC setpoint')
+        axs[i].plot(t[:w_actual.shape[1]], w_actual[i, :],
+                    color=colors[i], lw=1.5, ls='-', alpha=0.85,
+                    label=rf'$\omega_{{{axes_names[i][:1]},meas}}$: MuJoCo odometry')
+        axs[i].set_ylabel(r'[rad/s]')
+        axs[i].set_title(f'Body {axes_names[i]}-axis rate', fontsize=11)
+        axs[i].legend(frameon=True, ncol=2, fontsize=10, loc='best')
+        _grid(axs[i])
+
+    fig.suptitle(
+        "Rate controller validation: NMPC setpoint vs measured\n"
+        r"(overlap $\Rightarrow$ good tracking; gap $\Rightarrow$ bandwidth / saturation issue)",
+        fontsize=12
+    )
+    axs[-1].set_xlabel(r"$t$ [s]")
+    fig.tight_layout()
+    return fig
+
+
 def plot_error(error, t):
     """Tracking error (x, y, z)."""
     fig, ax = _new_figure()

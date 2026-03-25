@@ -19,7 +19,7 @@ import numpy as np
 #  1.  Initial conditions
 # ══════════════════════════════════════════════════════════════════════════════
 
-P0 = [1.0, 1.0, 1.0]            # position  [x, y, z]  [m]
+P0 = [2.0, 0.0, 1.0]            # position  [x, y, z]  [m]
 V0 = [0.0, 0.0, 0.0]            # velocity  [vx, vy, vz]  [m/s]
 Q0 = [1.0, 0.0, 0.0, 0.0]      # quaternion [qw, qx, qy, qz]
 W0 = [0.0, 0.0, 0.0]            # angular velocity [wx, wy, wz]  [rad/s]

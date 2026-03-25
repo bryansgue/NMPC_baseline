@@ -19,7 +19,7 @@ from casadi import (
 import numpy as np
 
 from utils.casadi_utils import quat_to_rot_casadi as QuatToRot, quat_kinematics_casadi as quat_p
-from config.experiment_config import MASS, G, TAU_RC
+from config.experiment_config import MASS_MUJOCO as MASS, G, TAU_RC
 
 
 # ──────────────────────────────────────────────────────────────────────────────
