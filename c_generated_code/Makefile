@@ -39,38 +39,38 @@
 # model
 MODEL_SRC=
 
-MODEL_SRC+= Drone_ode_complete_model/Drone_ode_complete_expl_ode_fun.c
-MODEL_SRC+= Drone_ode_complete_model/Drone_ode_complete_expl_vde_forw.c
-MODEL_SRC+= Drone_ode_complete_model/Drone_ode_complete_expl_vde_adj.c
+MODEL_SRC+= Drone_ode_rate_ctrl_model/Drone_ode_rate_ctrl_expl_ode_fun.c
+MODEL_SRC+= Drone_ode_rate_ctrl_model/Drone_ode_rate_ctrl_expl_vde_forw.c
+MODEL_SRC+= Drone_ode_rate_ctrl_model/Drone_ode_rate_ctrl_expl_vde_adj.c
 
 MODEL_OBJ := $(MODEL_SRC:.c=.o)
 # optimal control problem - mostly CasADi exports
 OCP_SRC=
 
 
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_0_fun.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_0_fun_jac_hess.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_0_fun_jac.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_fun.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_fun_jac_hess.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_fun_jac.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_e_fun.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_e_fun_jac_hess.c
-OCP_SRC+= Drone_ode_complete_cost/Drone_ode_complete_cost_ext_cost_e_fun_jac.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_0_fun.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_0_fun_jac_hess.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_0_fun_jac.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_fun.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_fun_jac_hess.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_fun_jac.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_e_fun.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_e_fun_jac_hess.c
+OCP_SRC+= Drone_ode_rate_ctrl_cost/Drone_ode_rate_ctrl_cost_ext_cost_e_fun_jac.c
 
-OCP_SRC+= acados_solver_Drone_ode_complete.c
+OCP_SRC+= acados_solver_Drone_ode_rate_ctrl.c
 
 OCP_OBJ := $(OCP_SRC:.c=.o)
 # for sim solver
-SIM_SRC= acados_sim_solver_Drone_ode_complete.c
+SIM_SRC= acados_sim_solver_Drone_ode_rate_ctrl.c
 SIM_OBJ := $(SIM_SRC:.c=.o)
 
 # for target example_sim
-EX_SIM_SRC= main_sim_Drone_ode_complete.c
+EX_SIM_SRC= main_sim_Drone_ode_rate_ctrl.c
 EX_SIM_OBJ := $(EX_SIM_SRC:.c=.o)
 EX_SIM_EXE := $(EX_SIM_SRC:.c=)
 # for target example
-EX_SRC= main_Drone_ode_complete.c
+EX_SRC= main_Drone_ode_rate_ctrl.c
 EX_OBJ := $(EX_SRC:.c=.o)
 EX_EXE := $(EX_SRC:.c=)
 
@@ -112,8 +112,8 @@ LDLIBS+= -lm
 LDLIBS+= 
 
 # libraries
-LIBACADOS_SOLVER=libacados_solver_Drone_ode_complete.so
-LIBACADOS_OCP_SOLVER=libacados_ocp_solver_Drone_ode_complete.so
+LIBACADOS_SOLVER=libacados_solver_Drone_ode_rate_ctrl.so
+LIBACADOS_OCP_SOLVER=libacados_ocp_solver_Drone_ode_rate_ctrl.so
 LIBACADOS_SIM_SOLVER=lib$(SIM_SRC:.c=.so)
 
 # virtual targets
@@ -164,7 +164,7 @@ ocp_cython: ocp_cython_o
 	-o acados_ocp_solver_pyx.so \
 	-Wl,-rpath=$(LIB_PATH) \
 	acados_ocp_solver_pyx.o \
-	$(abspath .)/libacados_ocp_solver_Drone_ode_complete.so \
+	$(abspath .)/libacados_ocp_solver_Drone_ode_rate_ctrl.so \
 	$(LDFLAGS) $(LDLIBS)
 
 
@@ -193,7 +193,7 @@ sim_cython: sim_cython_o
 	-o acados_sim_solver_pyx.so \
 	-Wl,-rpath=$(LIB_PATH) \
 	acados_sim_solver_pyx.o \
-	$(abspath .)/libacados_sim_solver_Drone_ode_complete.so \
+	$(abspath .)/libacados_sim_solver_Drone_ode_rate_ctrl.so \
 	$(LDFLAGS) $(LDLIBS)
 
 clean:
@@ -205,13 +205,13 @@ clean_ocp_shared_lib:
 	$(RM) $(OCP_OBJ)
 
 clean_ocp_cython:
-	$(RM) libacados_ocp_solver_Drone_ode_complete.so
-	$(RM) acados_solver_Drone_ode_complete.o
+	$(RM) libacados_ocp_solver_Drone_ode_rate_ctrl.so
+	$(RM) acados_solver_Drone_ode_rate_ctrl.o
 	$(RM) acados_ocp_solver_pyx.so
 	$(RM) acados_ocp_solver_pyx.o
 
 clean_sim_cython:
-	$(RM) libacados_sim_solver_Drone_ode_complete.so
-	$(RM) acados_sim_solver_Drone_ode_complete.o
+	$(RM) libacados_sim_solver_Drone_ode_rate_ctrl.so
+	$(RM) acados_sim_solver_Drone_ode_rate_ctrl.o
 	$(RM) acados_sim_solver_pyx.so
 	$(RM) acados_sim_solver_pyx.o
